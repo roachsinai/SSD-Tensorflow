@@ -206,6 +206,7 @@ def get_init_fn(flags):
                       for scope in flags.checkpoint_exclude_scopes.split(',')]
 
     # TODO(sguada) variables.filter_variables()
+    # 创建一个列表，包含除了exclusions之外所有需要读取的变量
     variables_to_restore = []
     for var in slim.get_model_variables():
         excluded = False
@@ -229,6 +230,7 @@ def get_init_fn(flags):
         checkpoint_path = flags.checkpoint_path
     tf.logging.info('Fine-tuning from %s. Ignoring missing vars: %s' % (checkpoint_path, flags.ignore_missing_vars))
 
+    # 建立一个从预训练模型checkpoint中读取上述列表中的相应变量的参数的函数
     return slim.assign_from_checkpoint_fn(
         checkpoint_path,
         variables_to_restore,

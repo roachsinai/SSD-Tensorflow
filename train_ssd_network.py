@@ -197,7 +197,7 @@ def main(_):
             num_ps_tasks=0)
         # Create global_step.
         with tf.device(deploy_config.variables_device()):
-            global_step = slim.create_global_step()
+            global_step = tf.train.create_global_step()
 
         # Select the dataset.
         dataset = dataset_factory.get_dataset(
@@ -236,11 +236,24 @@ def main(_):
             image, glabels, gbboxes = \
                 image_preprocessing_fn(image, glabels, gbboxes,
                                        out_shape=ssd_shape,
-                                       data_format=DATA_FORMAT)
+                                       data_format=DATA_FORMAT) #DATA_FARMAT: 'NCHW'
             # Encode groundtruth labels and bboxes.
+            # glocalisationso bbox位移预测值: feat_map中每一个像素点对应的gbbox与anchors的位移
+            # f个(m,m,k)，f个(m,m,k,4xywh)，f个(m,m,k) f表示提取ssd特征的层的数目
+            # 0-20数字,方便loss的坐标记录,IOU值
+
+            # gclasse：搜索框对应的真实类别
+            #　　　　　 长度为ssd特征层f的list，每一个元素是一个Tensor，
+            #          shape为：该层中心点行数×列数×每个中心点包含搜索框数目
+            # gscores：搜索框和真实框的IOU，gclasses中记录的就是该真实框的类别
+            #　　　　　 长度为ssd特征层f的list，每一个元素是一个Tensor，
+            #          shape为：该层中心点行数×列数×每个中心点包含搜索框数目
+            # glocalisations：搜索框相较于真实框位置修正，由于有4个坐标，所以维度多了一维
+            #　　　　　　　    长度为ssd特征层f的list，每一个元素是一个Tensor，
+            #                shape为：该层中心点行数×列数×每个中心点包含搜索框数目×4
             gclasses, glocalisations, gscores = \
                 ssd_net.bboxes_encode(glabels, gbboxes, ssd_anchors)
-            batch_shape = [1] + [len(ssd_anchors)] * 3
+            batch_shape = [1] + [len(ssd_anchors)] * 3 # (1, f, f, f)
 
             # Training batches and queue.
             r = tf.train.batch(
@@ -250,6 +263,36 @@ def main(_):
                 capacity=5 * FLAGS.batch_size)
             b_image, b_gclasses, b_glocalisations, b_gscores = \
                 tf_utils.reshape_list(r, batch_shape)
+            """
+            <tf.Tensor 'batch:0' shape=(2, 3, 300, 300) dtype=float32>
+            
+            [<tf.Tensor 'batch:1' shape=(2, 38, 38, 4) dtype=int64>,
+            <tf.Tensor 'batch:2' shape=(2, 19, 19, 6) dtype=int64>,
+            <tf.Tensor 'batch:3' shape=(2, 10, 10, 6) dtype=int64>,
+            <tf.Tensor 'batch:4' shape=(2, 5, 5, 6) dtype=int64>,
+            <tf.Tensor 'batch:5' shape=(2, 3, 3, 4) dtype=int64>,
+            <tf.Tensor 'batch:6' shape=(2, 1, 1, 4) dtype=int64>]
+            
+            [<tf.Tensor 'batch:7' shape=(2, 38, 38, 4, 4) dtype=float32>,
+            <tf.Tensor 'batch:8' shape=(2, 19, 19, 6, 4) dtype=float32>,
+            <tf.Tensor 'batch:9' shape=(2, 10, 10, 6, 4) dtype=float32>,
+            <tf.Tensor 'batch:10' shape=(2, 5, 5, 6, 4) dtype=float32>,
+            <tf.Tensor 'batch:11' shape=(2, 3, 3, 4, 4) dtype=float32>,
+            <tf.Tensor 'batch:12' shape=(2, 1, 1, 4, 4) dtype=float32>]
+            
+            [<tf.Tensor 'batch:13' shape=(2, 38, 38, 4) dtype=float32>,
+            <tf.Tensor 'batch:14' shape=(2, 19, 19, 6) dtype=float32>,
+            <tf.Tensor 'batch:15' shape=(2, 10, 10, 6) dtype=float32>,
+            <tf.Tensor 'batch:16' shape=(2, 5, 5, 6) dtype=float32>,
+            <tf.Tensor 'batch:17' shape=(2, 3, 3, 4) dtype=float32>,
+            <tf.Tensor 'batch:18' shape=(2, 1, 1, 4) dtype=float32>]
+            
+            """
+
+            # import ipdb
+            # ipdb.set_trace()
+            def pp(x):
+                print(x.get_shape().as_list())
 
             # Intermediate queueing: unique batch computation pipeline for all
             # GPUs running the training.
@@ -312,7 +355,7 @@ def main(_):
             summaries.add(tf.summary.histogram(variable.op.name, variable))
 
         # =================================================================== #
-        # Configure the moving averages.
+        # Configure the moving averages. 滑动平均
         # =================================================================== #
         if FLAGS.moving_average_decay:
             moving_average_variables = slim.get_model_variables()
@@ -375,14 +418,14 @@ def main(_):
             logdir=FLAGS.train_dir,
             master='',
             is_chief=True,
-            init_fn=tf_utils.get_init_fn(FLAGS),
-            summary_op=summary_op,
-            number_of_steps=FLAGS.max_number_of_steps,
-            log_every_n_steps=FLAGS.log_every_n_steps,
-            save_summaries_secs=FLAGS.save_summaries_secs,
-            saver=saver,
-            save_interval_secs=FLAGS.save_interval_secs,
-            session_config=config,
+            init_fn=tf_utils.get_init_fn(FLAGS),            # 从预训练模型checkpoint中读取变量参数
+            summary_op=summary_op,                          # tf.summary.merge节点
+            number_of_steps=FLAGS.max_number_of_steps,      # 训练step
+            log_every_n_steps=FLAGS.log_every_n_steps,      # 输出训练信息间隔
+            save_summaries_secs=FLAGS.save_summaries_secs,  # 每次summary时间间隔
+            saver=saver,                                    # tf.train.Saver节点
+            save_interval_secs=FLAGS.save_interval_secs,    # 每次model保存step间隔
+            session_config=config,                          # sess参数
             sync_optimizer=None)
 
 

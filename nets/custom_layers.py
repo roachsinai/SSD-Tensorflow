@@ -82,6 +82,8 @@ def l2_normalization(
         inputs_shape = inputs.get_shape()
         inputs_rank = inputs_shape.ndims
         dtype = inputs.dtype.base_dtype
+
+        # 在channel上做标准化
         if data_format == 'NHWC':
             # norm_dim = tf.range(1, inputs_rank-1)
             norm_dim = tf.range(inputs_rank-1, inputs_rank)
@@ -95,8 +97,10 @@ def l2_normalization(
         outputs = nn.l2_normalize(inputs, norm_dim, epsilon=1e-12)
         # Additional scaling.
         if scaling:
+            # 从collections获取变量
             scale_collections = utils.get_variable_collections(
                 variables_collections, 'scale')
+            # 创建变量shape，shape＝channel的层数（depth）
             scale = variables.model_variable('gamma',
                                              shape=params_shape,
                                              dtype=dtype,

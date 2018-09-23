@@ -205,6 +205,8 @@ def distorted_bounding_box_crop(image,
         scope: Optional scope for name_scope.
     Returns:
         A tuple, a 3-D Tensor cropped_image and the distorted bbox
+        cropped_image: 在image上随机切出的patch
+
     """
     with tf.name_scope(scope, 'distorted_bounding_box_crop', [image, bboxes]):
         # Each bounding box has shape [1, num_boxes, box coords] and
@@ -229,6 +231,7 @@ def distorted_bounding_box_crop(image,
         labels, bboxes = tfe.bboxes_filter_overlap(labels, bboxes,
                                                    threshold=BBOX_CROP_OVERLAP,
                                                    assign_negative=False)
+        bboxes = tf.Print(bboxes, [bboxes], "print bboxes: ")
         return cropped_image, labels, bboxes, distort_bbox
 
 

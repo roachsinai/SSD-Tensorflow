@@ -67,14 +67,18 @@ def ssd_bboxes_select_layer(predictions_layer,
     """
     # First decode localizations features if necessary.
     if decode:
+        # shape (1, 38|19|10|5.., 38|19|10|5.., 4|6, 4)
         localizations_layer = ssd_bboxes_decode(localizations_layer, anchors_layer)
 
+    # import ipdb
+    # ipdb.set_trace()
+
     # Reshape features to: Batches x N x N_labels | 4.
-    p_shape = predictions_layer.shape
+    p_shape = predictions_layer.shape # (1, 38|19|10|5.., 38|19|10|5.., 4|6, 21)
     batch_size = p_shape[0] if len(p_shape) == 5 else 1
     predictions_layer = np.reshape(predictions_layer,
                                    (batch_size, -1, p_shape[-1]))
-    l_shape = localizations_layer.shape
+    l_shape = localizations_layer.shape # (1, 38|19|10|5.., 38|19|10|5.., 4|6, 4)
     localizations_layer = np.reshape(localizations_layer,
                                      (batch_size, -1, l_shape[-1]))
 
@@ -88,10 +92,14 @@ def ssd_bboxes_select_layer(predictions_layer,
         scores = scores[mask]
         bboxes = localizations_layer[mask]
     else:
+        # 挑选时不考虑背景
         sub_predictions = predictions_layer[:, :, 1:]
         idxes = np.where(sub_predictions > select_threshold)
+        # bbox的预测类别 1-D array
         classes = idxes[-1]+1
+        # bbox的预测类别得分 1-D array
         scores = sub_predictions[idxes]
+        # bbox 2-D array
         bboxes = localizations_layer[idxes[:-1]]
 
     return classes, scores, bboxes

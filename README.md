@@ -1,3 +1,9 @@
+# SSD-Tensorflow Comment version
+
+这个fork版本主要是添加了学习原代码中的一些注释，主要是基于[Hellcatzm/SSD-Tensorflow](https://github.com/Hellcatzm/SSD-Tensorflow)以及[SSD-TensorFlow 源码解析](https://zhuanlan.zhihu.com/p/38013662)。
+
++ [Transform.py中transform函数中第5种augment方法jaccard](https://github.com/daniaokuye/SSD_data_augment/issues/2)
+
 # SSD: Single Shot MultiBox Detector in TensorFlow
 
 SSD is an unified framework for object detection with a single network. It has been originally introduced in this research [article](http://arxiv.org/abs/1512.02325).
@@ -18,19 +24,22 @@ Here are two examples of successful detection outputs:
 ![](pictures/ex2.png "SSD anchors")
 
 To run the notebook you first have to unzip the checkpoint files in ./checkpoint
-```bash
+
+```{.python .input}
 unzip ssd_300_vgg.ckpt.zip
 ```
+
 and then start a jupyter notebook with
-```bash
+
+```{.python .input}
 jupyter notebook notebooks/ssd_notebook.ipynb
 ```
-
 
 ## Datasets
 
 The current version only supports Pascal VOC datasets (2007 and 2012). In order to be used for training a SSD model, the former need to be converted to TF-Records using the `tf_convert_data.py` script:
-```bash
+
+```{.python .input}
 DATASET_DIR=./VOC2007/test/
 OUTPUT_DIR=./tfrecords
 python tf_convert_data.py \
@@ -39,6 +48,7 @@ python tf_convert_data.py \
     --output_name=voc_2007_train \
     --output_dir=${OUTPUT_DIR}
 ```
+
 Note the previous command generated a collection of TF-Records instead of a single file in order to ease shuffling during training.
 
 ## Evaluation on Pascal VOC 2007
@@ -54,7 +64,8 @@ The present TensorFlow implementation of SSD models have the following performan
 We are working hard at reproducing the same performance as the original [Caffe implementation](https://github.com/weiliu89/caffe/tree/ssd)!
 
 After downloading and extracting the previous checkpoints, the evaluation metrics should be reproducible by running the following command:
-```bash
+
+```{.python .input}
 EVAL_DIR=./logs/
 CHECKPOINT_PATH=./checkpoints/VGG_VOC0712_SSD_300x300_ft_iter_120000.ckpt
 python eval_ssd_network.py \
@@ -66,10 +77,12 @@ python eval_ssd_network.py \
     --checkpoint_path=${CHECKPOINT_PATH} \
     --batch_size=1
 ```
+
 The evaluation script provides estimates on the recall-precision curve and compute the mAP metrics following the Pascal VOC 2007 and 2012 guidelines.
 
 In addition, if one wants to experiment/test a different Caffe SSD checkpoint, the former can be converted to TensorFlow checkpoints as following:
-```sh
+
+```{.python .input .sh}
 CAFFE_MODEL=./ckpts/SSD_300x300_ft_VOC0712/VGG_VOC0712_SSD_300x300_ft_iter_120000.caffemodel
 python caffe_to_tensorflow.py \
     --model_name=ssd_300_vgg \
@@ -84,7 +97,8 @@ The script `train_ssd_network.py` is in charged of training the network. Similar
 ### Fine-tuning existing SSD checkpoints
 
 The easiest way to fine the SSD model is to use as pre-trained SSD network (VGG-300 or VGG-512). For instance, one can fine a model starting from the former as following:
-```bash
+
+```{.python .input}
 DATASET_DIR=./tfrecords
 TRAIN_DIR=./logs/
 CHECKPOINT_PATH=./checkpoints/ssd_300_vgg.ckpt
@@ -102,10 +116,12 @@ python train_ssd_network.py \
     --learning_rate=0.001 \
     --batch_size=32
 ```
+
 Note that in addition to the training script flags, one may also want to experiment with data augmentation parameters (random cropping, resolution, ...) in `ssd_vgg_preprocessing.py` or/and network parameters (feature layers, anchors boxes, ...) in `ssd_vgg_300/512.py`
 
 Furthermore, the training script can be combined with the evaluation routine in order to monitor the performance of saved checkpoints on a validation dataset. For that purpose, one can pass to training and validation scripts a GPU memory upper limit such that both can run in parallel on the same device. If some GPU memory is available for the evaluation script, the former can be run in parallel as follows:
-```bash
+
+```{.python .input}
 EVAL_DIR=${TRAIN_DIR}/eval
 python eval_ssd_network.py \
     --eval_dir=${EVAL_DIR} \
@@ -122,7 +138,8 @@ python eval_ssd_network.py \
 ### Fine-tuning a network trained on ImageNet
 
 One can also try to build a new SSD model based on standard architecture (VGG, ResNet, Inception, ...) and set up on top of it the `multibox` layers (with specific anchors, ratios, ...). For that purpose, you can fine-tune a network by only loading the weights of the original architecture, and initialize randomly the rest of network. For instance, in the case of the [VGG-16 architecture](http://download.tensorflow.org/models/vgg_16_2016_08_28.tar.gz), one can train a new model as following:
-```bash
+
+```{.python .input}
 DATASET_DIR=./tfrecords
 TRAIN_DIR=./log/
 CHECKPOINT_PATH=./checkpoints/vgg_16.ckpt
@@ -144,8 +161,10 @@ python train_ssd_network.py \
     --learning_rate_decay_factor=0.94 \
     --batch_size=32
 ```
+
 Hence, in the former command, the training script randomly initializes the weights belonging to the `checkpoint_exclude_scopes` and load from the checkpoint file `vgg_16.ckpt` the remaining part of the network. Note that we also specify with the `trainable_scopes` parameter to first only train the new SSD components and left the rest of VGG network unchanged. Once the network has converged to a good first result (~0.5 mAP for instance), you can fine-tuned the complete network as following:
-```bash
+
+```{.python .input}
 DATASET_DIR=./tfrecords
 TRAIN_DIR=./log_finetune/
 CHECKPOINT_PATH=./log/model.ckpt-N
